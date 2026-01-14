@@ -27,3 +27,9 @@ void listMovies(MovieList *list);
 void searchMovies(MovieList *list);
 void showMovieInfo(MovieList *list);
 void addMovie(MovieList *list);
+
+void updateMovie(MovieList *list);
+void removeMovie(MovieList *list);
+void clearMovies(MovieList *list);
+void importMovies(MovieList *list);
+void exportMovies(MovieList *list);
