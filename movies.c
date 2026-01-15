@@ -115,19 +115,19 @@ void searchMovies(MovieList *list) {
         int match = 0;
 
         switch(op) {
-            case 1: // Titulo
+            case 1:
                 toLowerCase(list->movies[i].title, fieldLower);
                 if (strstr(fieldLower, termLower)) match = 1;
                 break;
-            case 2: // Genero
+            case 2:
                 toLowerCase(list->movies[i].genres, fieldLower);
                 if (strstr(fieldLower, termLower)) match = 1;
                 break;
-            case 3: // Realizador
+            case 3:
                 toLowerCase(list->movies[i].director, fieldLower);
                 if (strstr(fieldLower, termLower)) match = 1;
                 break;
-            case 4: // Ator
+            case 4:
                 toLowerCase(list->movies[i].actors, fieldLower);
                 if (strstr(fieldLower, termLower)) match = 1;
                 break;
@@ -264,97 +264,63 @@ void clearMovies(MovieList *list) {
 void parseLineAndAdd(char *line, MovieList *list) {
     if (list->count >= MAX_MOVIES) return;
 
-    int fieldCount = 0;
-    char *tmp = strdup(line);
-    char *p = strtok(tmp, ";");
-    while (p) {
-        fieldCount++;
-        p = strtok(NULL, ";");
-    }
-    free(tmp);
-
-    if (fieldCount < 11) {
-        printf("Linha ignorada (formato inválido): %s\n", line);
-        return;
-    }
-
     Movie m;
     memset(&m, 0, sizeof(Movie));
 
-    // Fazer uma cópia para usar no strtok
-    char buffer[4096];
-    strcpy(buffer, line);
+    char *ptr = line;
+    int col = 0;
+    char buffer[MAX_DESC + 100]; 
+    int bufIdx = 0;
 
-    // Tokenizar em 11 campos
-    char *token = strtok(buffer, ";");  // code
-    if (!token) return;
-    m.code = atoi(token);
+    while (*ptr != '\0' && *ptr != '\n' && *ptr != '\r') {
+        
+        if (*ptr == ';') {
+            buffer[bufIdx] = '\0';
 
-    // Verificar duplicados
-    for (int i = 0; i < list->count; i++) {
-        if (list->movies[i].code == m.code) {
-            return; // ignora duplicados
+            switch(col) {
+                case 0: m.code = atoi(buffer); break;
+                case 1: strncpy(m.title, buffer, MAX_STR-1); break;
+                case 2: strncpy(m.genres, buffer, MAX_STR-1); break;
+                case 3: strncpy(m.description, buffer, MAX_DESC-1); break;
+                case 4: strncpy(m.director, buffer, MAX_STR-1); break;
+                case 5: strncpy(m.actors, buffer, MAX_STR-1); break;
+                case 6: m.year = atoi(buffer); break;
+                case 7: m.duration = atoi(buffer); break;
+                case 8: m.rating = atof(buffer); break;
+                case 9: m.favorite = atoi(buffer); break;
+                case 10: m.revenue = atof(buffer); break;
+            }
+            
+            col++;
+            bufIdx = 0;
+        } 
+        else {
+            if (bufIdx < MAX_DESC) {
+                buffer[bufIdx++] = *ptr;
+            }
         }
+        ptr++;
+    }
+    
+    buffer[bufIdx] = '\0';
+    if (col == 10) { 
+         m.revenue = atof(buffer);
+    }
+    
+    int exists = 0;
+    for(int i=0; i<list->count; i++) {
+        if(list->movies[i].code == m.code) { exists = 1; break; }
     }
 
-    // title
-    token = strtok(NULL, ";");
-    if (token) strncpy(m.title, token, MAX_STR);
-
-    // genres
-    token = strtok(NULL, ";");
-    if (token) strncpy(m.genres, token, MAX_STR);
-
-    // description
-    token = strtok(NULL, ";");
-    if (token) strncpy(m.description, token, MAX_DESC);
-
-    // director
-    token = strtok(NULL, ";");
-    if (token) strncpy(m.director, token, MAX_STR);
-
-    // actors
-    token = strtok(NULL, ";");
-    if (token) strncpy(m.actors, token, MAX_STR);
-
-    // year
-    token = strtok(NULL, ";");
-    if (token) m.year = atoi(token); else m.year = 0;
-
-    // duration
-    token = strtok(NULL, ";");
-    if (token) m.duration = atoi(token); else m.duration = 0;
-
-    // rating (pode ser 8,2)
-    token = strtok(NULL, ";");
-    if (token) {
-        for (int i = 0; token[i]; i++) {
-            if (token[i] == ',') token[i] = '.';
-        }
-        m.rating = atof(token);
-    } else m.rating = 0;
-
-    // favorite
-    token = strtok(NULL, ";");
-    if (token) m.favorite = atoi(token); else m.favorite = 0;
-
-    // revenue
-    token = strtok(NULL, ";");
-    if (token) {
-        for (int i = 0; token[i]; i++) {
-            if (token[i] == ',') token[i] = '.';
-        }
-        m.revenue = atof(token);
-    } else m.revenue = 0;
-
-    // mete no array
-    list->movies[list->count] = m;
-    list->count++;
+    if (!exists && m.code > 0) {
+        list->movies[list->count] = m;
+        list->count++;
+    }
 }
 
 void importMovies(MovieList *list) {
     char filename[MAX_STR];
-    readString(filename, MAX_STR, "Nome do ficheiro (ex: movies.csv): ");
+    readString(filename, MAX_STR, "Nome do ficheiro: ");
 
     FILE *f = fopen(filename, "r");
     if (!f) {
@@ -362,18 +328,20 @@ void importMovies(MovieList *list) {
         return;
     }
 
-    char buffer[1024];
+    char buffer[4096]; 
+    
     int initialCount = list->count;
 
-    fgets(buffer, 1024, f); 
+    fgets(buffer, 4096, f); 
 
-    while (fgets(buffer, 1024, f)) {
-        buffer[strcspn(buffer, "\n")] = 0;
+    while (fgets(buffer, 4096, f)) {
         parseLineAndAdd(buffer, list);
     }
 
     fclose(f);
-    printf("SUCESSO: Foram importados %d filmes.\n", list->count - initialCount);
+    
+    printf("SUCESSO: Total de filmes: %d (Novos adicionados: %d).\n", 
+           list->count, list->count - initialCount);
 }
 
 void exportMovies(MovieList *list) {
@@ -393,19 +361,16 @@ void exportMovies(MovieList *list) {
         return;
     }
 
-    // Header igual ao CSV original
     fprintf(f, "code;title;genres;description;director;actors;year;duration;rating;favorite;revenue\n");
 
     for (int i = 0; i < list->count; i++) {
         Movie m = list->movies[i];
 
-        // Converter o rating e revenue para vírgula decimal
         char ratingStr[16], revenueStr[32];
 
         snprintf(ratingStr, sizeof(ratingStr), "%.1f", m.rating);
         snprintf(revenueStr, sizeof(revenueStr), "%.2f", m.revenue);
 
-        // Trocar ponto por vírgula
         for (int j = 0; ratingStr[j]; j++) if (ratingStr[j] == '.') ratingStr[j] = ',';
         for (int j = 0; revenueStr[j]; j++) if (revenueStr[j] == '.') revenueStr[j] = ',';
 
